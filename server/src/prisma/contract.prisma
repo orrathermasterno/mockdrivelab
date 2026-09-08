@@ -1,0 +1,40 @@
+// use prisma
+
+model User {
+  id Int @id @default(autoincrement())
+
+  email        String @unique
+  name         String?
+  passwordHash String
+
+  ownedFiles    File[] @relation("FileOwner")
+  uploadedFiles File[] @relation("FileUploader")
+  editedFiles   File[] @relation("FileEditor")
+}
+
+model File {
+  id Int @id @default(autoincrement())
+
+  title      String
+  extension  String
+  storageKey String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  size   Int
+  sha256 String
+
+  ownerId Int
+  owner   User @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  uploaderId Int
+  uploader   User @relation("FileUploader", fields: [uploaderId], references: [id])
+
+  editorId Int?
+  editor   User? @relation("FileEditor", fields: [editorId], references: [id])
+
+  @@index([ownerId])
+  @@index([uploaderId])
+  @@index([editorId])
+}
