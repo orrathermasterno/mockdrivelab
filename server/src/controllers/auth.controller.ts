@@ -14,10 +14,12 @@ export async function registerUser(req: Request, res: Response) {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPasswordBytes = Buffer.from(hashedPassword, 'utf8');
+
         await db.orm.public.User.create({
             email: email,
             name: username,
-            passwordHash: hashedPassword,
+            passwordHash: hashedPasswordBytes,
         });
         res.status(201).json({ message: 'User registered successfully' });
     } catch (err) {
@@ -39,7 +41,8 @@ export async function loginUser(req: Request, res: Response) {
             .first();
         if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        const hashString = Buffer.from(user.passwordHash).toString('utf8');
+        const isMatch = await bcrypt.compare(password, hashString);
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
         const token = jwt.sign({ id: user.id }, process.env['JWT_SECRET']!, { expiresIn: '10h' });

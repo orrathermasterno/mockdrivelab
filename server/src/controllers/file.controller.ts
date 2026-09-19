@@ -4,6 +4,7 @@ import { getFileHash } from "../utils/hash"
 import path from 'path';
 import fs from 'fs';
 import { db } from "../prisma/db";
+import { Temporal } from 'temporal-polyfill';
 
 export async function getFiles(req: AuthRequest, res: Response) {
     const userId = req.user!.id;
@@ -11,7 +12,7 @@ export async function getFiles(req: AuthRequest, res: Response) {
     try {
         const files = await db.orm.public.File
             .where({ownerId: userId })
-            .include("editor")
+            .include("uploader")
             .include("editor")
             .all();
 
@@ -87,7 +88,7 @@ export async function uploadFile(req: AuthRequest, res: Response) {
             extension,
             storageKey: filename,
             size,
-            sha256: getFileHash(filePath),
+            sha256: Buffer.from(getFileHash(filePath), 'hex'),
             ownerId: userId,
             uploaderId: userId,
         });
@@ -107,15 +108,17 @@ export const updateFile = async (req: AuthRequest, res: Response) => {
     const title = path.basename(req.file.originalname, extension);
 
     try {
-        const existingFile = await db.orm.public.File.first({
-            ownerId: userId,
-            title: title,
-            extension: extension
-        });
+        const existingFile = await db.orm.public.File.where({ ownerId: userId, title: title, extension: extension }).first();
 
         if (!existingFile) {
             fs.unlinkSync(req.file.path); // destr file stored by middlew
             return res.status(404).json({ message: 'File not found' });
+        }
+
+        const newHash = Buffer.from(getFileHash(req.file.path), 'hex');
+        if (Buffer.from(existingFile.sha256).equals(newHash)) {
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            return res.status(200).json({ message: 'File up to date' });
         }
 
         const filePath = path.join(process.cwd(), 'uploads', existingFile.storageKey);
@@ -128,15 +131,17 @@ export const updateFile = async (req: AuthRequest, res: Response) => {
             .update({
                 storageKey: req.file.filename,
                 size: req.file.size,
-                sha256: getFileHash(req.file.path),
+                sha256: newHash,
                 editorId: userId,
+                updatedAt: Temporal.Now.instant() as any
             });
 
         res.status(200).json({ message: 'File updated', file: updatedFile });
     } catch (err) {
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
+        console.error("Update failed:", err);
+        // if (req.file && fs.existsSync(req.file.path)) {
+        //     fs.unlinkSync(req.file.path);
+        // }
         res.status(500).json({ message: 'Error updating file' });
     }
 };
