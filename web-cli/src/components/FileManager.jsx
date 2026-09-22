@@ -11,6 +11,7 @@ export default function FileManager() {
   const [sortAsc, setSortAsc] = useState(true);
   const [filter, setFilter] = useState('all'); 
   const [preview, setPreview] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   const [columns, setColumns] = useState({
     createdAt: true,
@@ -71,40 +72,40 @@ export default function FileManager() {
     }
   };
 
-  const handleUpload = async (e) => {
-    const fileList = e.target.files;
-    if (!fileList.length) return;
+  // const handleUpload = async (e) => {
+  //   const fileList = e.target.files;
+  //   if (!fileList.length) return;
 
-    let failed = 0;
+  //   let failed = 0;
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      const formData = new FormData();
+  //   for (let i = 0; i < fileList.length; i++) {
+  //     const file = fileList[i];
+  //     const formData = new FormData();
 
-      formData.append('file', file);
+  //     formData.append('file', file);
 
-      const existingFile = files.find(
-        (f) => `${f.title}${f.extension}` === file.name
-      );
+  //     const existingFile = files.find(
+  //       (f) => `${f.title}${f.extension}` === file.name
+  //     );
 
-      const method = existingFile ? 'PUT' : 'POST';
+  //     const method = existingFile ? 'PUT' : 'POST';
 
-      try {
-        await uploadFile(method, formData, token);
-      } catch (err) {
-        console.error(`Network error on ${file.name}:`, err);
-        failed++;
-      }
-    }
+  //     try {
+  //       await uploadFile(method, formData, token);
+  //     } catch (err) {
+  //       console.error(`Network error on ${file.name}:`, err);
+  //       failed++;
+  //     }
+  //   }
 
-    if (failed > 0) {
-      alert(`Finished with ${failed} error(s). Check console for details.`);
-    }
+  //   if (failed > 0) {
+  //     alert(`Finished with ${failed} error(s). Check console for details.`);
+  //   }
 
-    await loadFiles(token); 
+  //   await loadFiles(token); 
 
-    e.target.value = '';
-  };
+  //   e.target.value = '';
+  // };
 
   
 const handlePreview = async (file) => {
@@ -193,8 +194,69 @@ const handlePreview = async (file) => {
       return sortAsc ? dateA - dateB : dateB - dateA;
     });
 
+  const processFiles = async (fileList) => {
+    if (!fileList || !fileList.length) return;
+    
+    let failed = 0;
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const existingFile = files.find(
+        (f) => `${f.title}${f.extension}` === file.name
+      );
+
+      const method = existingFile ? 'PUT' : 'POST';
+
+      try {
+        await uploadFile(method, formData, token);
+      } catch (err) {
+        console.error(`Network error on ${file.name}:`, err);
+        failed++;
+      }
+    }
+
+    if (failed > 0) {
+      alert(`Finished with ${failed} error(s). Check console for details.`);
+    }
+
+    await loadFiles();
+  };
+
+  const handleUpload = async (e) => {
+    await processFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await processFiles(e.dataTransfer.files);
+    }
+  };
+
   return (
-    <div className="file-manager">
+    <div 
+      className={`file-manager ${isDragging ? 'drag-active' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="header-container">
         <h2>Mockdrive</h2>
         <button onClick={logout} className="btn logout-btn">Logout</button>

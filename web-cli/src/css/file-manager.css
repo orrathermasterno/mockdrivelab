@@ -216,7 +216,6 @@
   margin-bottom: 0;
 }
 
-/* Secondary Button Style for Logout */
 .logout-btn {
   background-color: var(--g-white);
   color: var(--g-text-gray);
@@ -228,4 +227,13 @@
   background-color: var(--g-bg-gray);
   color: var(--g-text-dark);
   box-shadow: var(--shadow-sm);
+}
+
+.file-manager.drag-active {
+  border: 2px dashed #007bff;
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.file-manager.drag-active * {
+  pointer-events: none;
 }
